@@ -1,0 +1,103 @@
+{
+  "name": "agent-doing",
+  "displayName": "Agent Doing",
+  "description": "Sync AI plugin working status from VS Code to mobile Dynamic Island/Live Activities",
+  "version": "0.0.1",
+  "publisher": "snhgn",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:agentDoing.simulateStatus"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentDoing.simulateStatus",
+        "title": "Agent Doing: Simulate Status"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Doing",
+      "properties": {
+        "agentDoing.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable status detection and bridge sending"
+        },
+        "agentDoing.transportMode": {
+          "type": "string",
+          "enum": [
+            "websocket",
+            "http"
+          ],
+          "default": "websocket",
+          "description": "Transport protocol to send status payloads to mobile bridge server"
+        },
+        "agentDoing.bridgeEndpoint": {
+          "type": "string",
+          "default": "ws://127.0.0.1:9876/status",
+          "description": "WebSocket or HTTP endpoint on your LAN phone gateway"
+        },
+        "agentDoing.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional bearer token for mobile bridge server"
+        },
+        "agentDoing.monitorLogFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Absolute log file paths for AI plugin outputs to parse (Plan A)"
+        },
+        "agentDoing.proxyListenPort": {
+          "type": "number",
+          "default": 18888,
+          "description": "Local proxy port used by network interception mode (Plan B)"
+        },
+        "agentDoing.proxyForwardBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional upstream API base URL for the interception proxy"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "echo \"No tests configured\""
+  },
+  "keywords": [
+    "vscode",
+    "extension",
+    "websocket",
+    "dynamic-island"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/snhgn/agent-doing.git"
+  },
+  "bugs": {
+    "url": "https://github.com/snhgn/agent-doing/issues"
+  },
+  "homepage": "https://github.com/snhgn/agent-doing#readme",
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "@types/vscode": "^1.95.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
