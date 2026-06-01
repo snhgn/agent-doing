@@ -3,7 +3,8 @@ name: Build and Publish Android APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs: {}
 
 permissions:
   contents: write
