@@ -68,7 +68,11 @@ class LogOutputStrategy implements DetectionStrategy {
     // 在这里可按 Copilot/Cursor/Codeium 各自日志格式补充 parser 规则。
     this.timer = setInterval(() => {
       for (const file of this.monitoredFiles) {
-        this.readIncremental(file, listener);
+        try {
+          this.readIncremental(file, listener);
+        } catch {
+          // 忽略单个日志读取异常，避免中断其他文件状态检测。
+        }
       }
     }, 1200);
   }
@@ -260,16 +264,32 @@ function parseStatusLine(line: string): Omit<StatusPayload, 'source' | 'timestam
     return undefined;
   }
 
-  if (normalized.includes('error') || normalized.includes('failed')) {
+  if (normalized.includes('error') || normalized.includes('failed') || normalized.includes('异常') || normalized.includes('失败')) {
     return { status: 'Error', message: line };
   }
-  if (normalized.includes('generating') || normalized.includes('stream')) {
+  if (
+    normalized.includes('generating') ||
+    normalized.includes('stream') ||
+    normalized.includes('输出中') ||
+    normalized.includes('生成中')
+  ) {
     return { status: 'Generating', message: line, progress: 70 };
   }
-  if (normalized.includes('thinking') || normalized.includes('request started')) {
+  if (
+    normalized.includes('thinking') ||
+    normalized.includes('request started') ||
+    normalized.includes('思考中') ||
+    normalized.includes('请求开始')
+  ) {
     return { status: 'Thinking', message: line, progress: 30 };
   }
-  if (normalized.includes('idle') || normalized.includes('completed') || normalized.includes('done')) {
+  if (
+    normalized.includes('idle') ||
+    normalized.includes('completed') ||
+    normalized.includes('done') ||
+    normalized.includes('空闲') ||
+    normalized.includes('完成')
+  ) {
     return { status: 'Idle', message: line, progress: 100 };
   }
 

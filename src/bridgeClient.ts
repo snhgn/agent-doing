@@ -12,6 +12,8 @@ export interface BridgeConfig {
 export class BridgeClient {
   private socket: WebSocket | undefined;
   private reconnectTimer: NodeJS.Timeout | undefined;
+  private pendingStatus: string | undefined;
+  private isStopping = false;
 
   constructor(private readonly config: BridgeConfig) {}
 
@@ -19,6 +21,8 @@ export class BridgeClient {
     if (!this.config.enabled) {
       return;
     }
+
+    this.isStopping = false;
 
     if (this.config.mode === 'websocket') {
       await this.connectWebSocket();
@@ -31,9 +35,12 @@ export class BridgeClient {
       this.reconnectTimer = undefined;
     }
 
+    this.isStopping = true;
+
     if (this.socket) {
       await new Promise<void>((resolve) => {
         this.socket?.once('close', () => resolve());
+        this.socket?.once('error', () => resolve());
         this.socket?.close();
       });
       this.socket = undefined;
@@ -49,9 +56,13 @@ export class BridgeClient {
 
     if (this.config.mode === 'websocket') {
       if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        this.pendingStatus = body;
+        if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
+          this.scheduleReconnect();
+        }
         return;
       }
-      this.socket.send(body);
+      await this.sendWebSocketMessage(body);
       return;
     }
 
@@ -63,11 +74,19 @@ export class BridgeClient {
       headers.authorization = 'Bearer ' + this.config.authToken;
     }
 
-    await fetch(this.config.endpoint, {
-      method: 'POST',
-      headers,
-      body
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      await fetch(this.config.endpoint, {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async connectWebSocket(): Promise<void> {
@@ -80,9 +99,23 @@ export class BridgeClient {
       const socket = new WebSocket(this.config.endpoint, { headers });
       this.socket = socket;
 
-      socket.on('open', () => resolve());
+      socket.on('open', () => {
+        const pending = this.pendingStatus;
+        this.pendingStatus = undefined;
+        if (pending) {
+          void this.sendWebSocketMessage(pending);
+        }
+        resolve();
+      });
       socket.on('error', () => resolve());
-      socket.on('close', () => this.scheduleReconnect());
+      socket.on('close', () => {
+        if (this.socket === socket) {
+          this.socket = undefined;
+        }
+        if (!this.isStopping) {
+          this.scheduleReconnect();
+        }
+      });
     });
   }
 
@@ -100,5 +133,16 @@ export class BridgeClient {
       this.reconnectTimer = undefined;
       void this.connectWebSocket();
     }, interval);
+  }
+
+  private async sendWebSocketMessage(body: string): Promise<void> {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.pendingStatus = body;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.socket?.send(body, () => resolve());
+    });
   }
 }
