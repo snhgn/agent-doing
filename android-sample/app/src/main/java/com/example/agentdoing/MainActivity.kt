@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -46,7 +47,11 @@ class MainActivity : AppCompatActivity() {
 
   override fun onResume() {
     super.onResume()
-    registerReceiver(receiver, IntentFilter("com.example.agentdoing.STATE_UPDATE"))
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      registerReceiver(receiver, IntentFilter("com.example.agentdoing.STATE_UPDATE"), Context.RECEIVER_NOT_EXPORTED)
+    } else {
+      registerReceiver(receiver, IntentFilter("com.example.agentdoing.STATE_UPDATE"))
+    }
   }
 
   override fun onPause() {
