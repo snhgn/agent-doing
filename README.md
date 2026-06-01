@@ -22,6 +22,23 @@ agent-doing/
    └─ bridgeClient.ts     # VS Code -> 手机端桥接通信
 ```
 
+## 文件功能说明（逐文件）
+
+- `package.json`
+  - 定义 VS Code 扩展元信息（名称、激活时机、命令、配置项）。
+  - 定义本地开发命令：`build`、`watch`、`test`。
+- `tsconfig.json`
+  - TypeScript 编译配置：`src -> out`，严格模式，Node + VS Code 类型。
+- `src/extension.ts`
+  - 扩展入口：读取 `agentDoing.*` 配置并启动检测与桥接。
+  - 注册命令 `agentDoing.simulateStatus`，用于手动发送一条状态做联调。
+- `src/statusDetector.ts`
+  - 状态检测核心：日志轮询（Plan A）+ 本地代理拦截（Plan B）。
+  - 输出统一 `StatusPayload`，状态枚举为 `Idle/Thinking/Generating/Error`。
+- `src/bridgeClient.ts`
+  - 负责把状态发送到手机端网关：支持 WebSocket 和 HTTP 两种模式。
+  - WebSocket 模式含断线重连；HTTP 模式按 JSON POST 上报。
+
 ## 核心 Scaffold 说明
 
 ### 1) `src/extension.ts`
@@ -66,11 +83,27 @@ agent-doing/
    - `Idle` → 完成态（可自动收起）
    - `Error` → 错误提示 + 重试入口
 
+## 使用方法
+
+1. 安装依赖并编译：
+   ```bash
+   npm install
+   npm run build
+   ```
+2. 在 VS Code 中打开本项目，按 `F5` 启动 Extension Development Host。
+3. 在扩展设置中配置 `agentDoing.*`：
+   - `transportMode` 与 `bridgeEndpoint`（手机端网关地址）至少需要正确设置；
+   - 若走日志方案，填写 `monitorLogFiles`（绝对路径）；
+   - 若走代理方案，设置 `proxyListenPort`，并按需设置 `proxyForwardBaseUrl`。
+4. 在命令面板执行 `Agent Doing: Simulate Status`，验证手机端是否收到状态。
+5. 联调通过后，再按目标 AI 插件日志格式或网络协议补充 `statusDetector.ts` 解析规则。
+
 ## 本地开发
 
 ```bash
 npm install
 npm run build
+npm run watch
 npm test
 ```
 
