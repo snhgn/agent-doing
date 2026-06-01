@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs: {}
 
 permissions:
   contents: write
@@ -39,7 +38,7 @@ jobs:
           fi
           echo "$GRADLE_HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Diagnostics: environment
+      - name: "Diagnostics: environment"
         shell: bash
         run: |
           set -euo pipefail
