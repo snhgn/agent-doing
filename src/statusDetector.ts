@@ -70,8 +70,8 @@ class LogOutputStrategy implements DetectionStrategy {
       for (const file of this.monitoredFiles) {
         try {
           this.readIncremental(file, listener);
-        } catch {
-          // 忽略单个日志读取异常，避免中断其他文件状态检测。
+        } catch (error) {
+          console.warn(`Agent Doing: 读取日志失败 (${file})`, error);
         }
       }
     }, 1200);

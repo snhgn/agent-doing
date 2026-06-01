@@ -10,9 +10,12 @@ export interface BridgeConfig {
 }
 
 export class BridgeClient {
+  private static readonly HTTP_TIMEOUT_MS = 5000;
+  private static readonly MAX_PENDING_STATUS = 50;
+
   private socket: WebSocket | undefined;
   private reconnectTimer: NodeJS.Timeout | undefined;
-  private pendingStatus: string | undefined;
+  private readonly pendingStatuses: string[] = [];
   private isStopping = false;
 
   constructor(private readonly config: BridgeConfig) {}
@@ -40,7 +43,10 @@ export class BridgeClient {
     if (this.socket) {
       await new Promise<void>((resolve) => {
         this.socket?.once('close', () => resolve());
-        this.socket?.once('error', () => resolve());
+        this.socket?.once('error', (error) => {
+          console.warn('Agent Doing: WebSocket close error', error);
+          resolve();
+        });
         this.socket?.close();
       });
       this.socket = undefined;
@@ -56,7 +62,7 @@ export class BridgeClient {
 
     if (this.config.mode === 'websocket') {
       if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        this.pendingStatus = body;
+        this.enqueuePendingStatus(body);
         if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
           this.scheduleReconnect();
         }
@@ -75,7 +81,7 @@ export class BridgeClient {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), BridgeClient.HTTP_TIMEOUT_MS);
 
     try {
       await fetch(this.config.endpoint, {
@@ -100,14 +106,12 @@ export class BridgeClient {
       this.socket = socket;
 
       socket.on('open', () => {
-        const pending = this.pendingStatus;
-        this.pendingStatus = undefined;
-        if (pending) {
-          void this.sendWebSocketMessage(pending);
-        }
+        void this.flushPendingStatuses().finally(() => resolve());
+      });
+      socket.on('error', (error) => {
+        console.warn('Agent Doing: WebSocket connect error', error);
         resolve();
       });
-      socket.on('error', () => resolve());
       socket.on('close', () => {
         if (this.socket === socket) {
           this.socket = undefined;
@@ -135,14 +139,51 @@ export class BridgeClient {
     }, interval);
   }
 
-  private async sendWebSocketMessage(body: string): Promise<void> {
+  private async sendWebSocketMessage(body: string): Promise<boolean> {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      this.enqueuePendingStatus(body);
+      return false;
+    }
+
+    return await new Promise<boolean>((resolve) => {
+      socket.send(body, (error) => {
+        if (error) {
+          console.warn('Agent Doing: WebSocket send error, queued for retry', error);
+          this.enqueuePendingStatus(body);
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      });
+    });
+  }
+
+  private async flushPendingStatuses(): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      this.pendingStatus = body;
       return;
     }
 
-    await new Promise<void>((resolve) => {
-      this.socket?.send(body, () => resolve());
-    });
+    const pending = [...this.pendingStatuses];
+    this.pendingStatuses.length = 0;
+    for (let i = 0; i < pending.length; i += 1) {
+      const payload = pending[i];
+      const sent = await this.sendWebSocketMessage(payload);
+      if (!sent) {
+        for (let j = i + 1; j < pending.length; j += 1) {
+          this.enqueuePendingStatus(pending[j]);
+        }
+        console.warn('Agent Doing: Pending status flush interrupted');
+        break;
+      }
+    }
+  }
+
+  private enqueuePendingStatus(body: string): void {
+    if (this.pendingStatuses.length >= BridgeClient.MAX_PENDING_STATUS) {
+      console.warn('Agent Doing: Pending status queue overflow, dropping oldest message');
+      this.pendingStatuses.shift();
+    }
+    this.pendingStatuses.push(body);
   }
 }
