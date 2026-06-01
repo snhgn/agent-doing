@@ -26,19 +26,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Cache Gradle user home
-        uses: actions/cache@v4
-        # allow cache failures to not break the build (service can be flaky)
-        continue-on-error: true
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            ~/.gradle/gradle-${{ env.GRADLE_VERSION }}
-          key: ${{ runner.os }}-gradle-${{ env.GRADLE_VERSION }}-${{ hashFiles('android-sample/**/*.gradle*','android-sample/settings.gradle.kts','android-sample/gradle.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
       - name: Install Gradle distribution
         shell: bash
         run: |
