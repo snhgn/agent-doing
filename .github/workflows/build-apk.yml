@@ -15,6 +15,7 @@ jobs:
     env:
       GRADLE_VERSION: '8.7'
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,6 +28,8 @@ jobs:
 
       - name: Cache Gradle user home
         uses: actions/cache@v4
+        # allow cache failures to not break the build (service can be flaky)
+        continue-on-error: true
         with:
           path: |
             ~/.gradle/caches
@@ -48,6 +51,26 @@ jobs:
           fi
           echo "$GRADLE_HOME/bin" >> "$GITHUB_PATH"
 
+      - name: Diagnostics: environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "---- PATH ----"
+          echo "$PATH"
+          echo "---- java -version ----"
+          java -version || true
+          echo "---- which unzip ----"
+          which unzip || true
+          echo "---- gradle location ----"
+          if [ -x "$GRADLE_HOME/bin/gradle" ]; then
+            "$GRADLE_HOME/bin/gradle" --version || true
+          else
+            echo "Gradle not found in expected location"
+          fi
+          echo "---- android-sample tree ----"
+          ls -la android-sample || true
+          ls -la android-sample/app || true
+
       - name: Ensure Android SDK packages
         shell: bash
         run: |
@@ -63,25 +86,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gradle -p android-sample assembleDebug
-
-      - name: Publish APK to GitHub Release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          APK_PATH="android-sample/app/build/outputs/apk/debug/app-debug.apk"
-          TAG="apk-${GITHUB_RUN_NUMBER}"
-          TITLE="APK build ${GITHUB_RUN_NUMBER}"
-          NOTES="Automated Android APK build from GitHub Actions"
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK_PATH#app-debug-${GITHUB_RUN_NUMBER}.apk" --clobber
-          else
-            gh release create "$TAG" "$APK_PATH#app-debug-${GITHUB_RUN_NUMBER}.apk" \
-              --title "$TITLE" \
-              --notes "$NOTES" \
-              --latest=false \
-              --prerelease
+          echo "Running: gradle -p android-sample assembleDebug"
+          if ! gradle -p android-sample assembleDebug; then
+            echo "Gradle build failed. Dumping logs and environment for debugging."
+            echo "-- ls android-sample --"
+            ls -la android-sample || true
+            echo "-- gradle --version --"
+            gradle --version || true
+            exit 1
           fi
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android-sample/app/build/outputs/apk/debug/app-debug.apk
