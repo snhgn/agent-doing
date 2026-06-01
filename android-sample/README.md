@@ -10,11 +10,11 @@ Android Sample for Agent Doing
 
 在本机构建与安装
 1. 使用 Android Studio 打开 `android-sample` 项目，Gradle 会自动同步并下载依赖。
-2. 连接手机（通过 USB 或同一热点），在 Android Studio 中运行或生成 APK：
+2. 如果你的机器已经安装了 Gradle，可以直接在 `android-sample` 目录下构建；仓库里不再保留不完整的 `gradlew` 包装脚本。
 
 ```bash
-# 在项目根目录（含 settings.gradle 的位置）执行（需要安装 Android SDK / Gradle）
-./gradlew assembleDebug
+# 在项目根目录（含 settings.gradle.kts 的位置）执行（需要安装 Android SDK / Gradle）
+gradle assembleDebug
 # 生成的 APK 在 app/build/outputs/apk/debug/app-debug.apk
 # 安装到手机（需要 adb 可用）
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -27,4 +27,4 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - 默认 Bridge 地址可在代码中修改（`WSClient.COMPANION_URL`），或在 UI 中扩展为可配置。
 
 限制
-- 我当前环境无法远程构建 APK（缺少 Android SDK/NDK），因此我已把完整可构建的工程放在 `android-sample`，请在你的机器或 CI 中构建。
+- 我当前环境无法远程构建 APK（缺少 Android SDK/NDK），但 GitHub Actions 工作流会在运行时下载 Gradle 并构建 APK。

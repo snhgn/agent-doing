@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-DIRNAME="$(dirname "$0")"
-"$DIRNAME/gradlew" "$@"
